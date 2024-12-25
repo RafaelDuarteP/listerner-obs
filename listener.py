@@ -7,6 +7,9 @@ import asyncio
 import json
 import socket
 import re
+import tkinter as tk
+from tkinter import messagebox
+
 
 class OBSWebSocketClient:
     def __init__(self, host, port, password):
@@ -197,25 +200,57 @@ class MessageHandler:
             print("Stopped live streaming and recording.")
 
 
+def start_listener(host, port, password, scene, audio_source):
+    try:
+        obs_client = OBSWebSocketClient(host, port, password)
+        obs_client.connect()
+        obs_client.authenticate()
+
+        controller = OBSController(obs_client, scene, audio_source)
+        message_handler = MessageHandler(controller)
+
+        udp_listener = UDPListener("0.0.0.0", 12345, message_handler.handle)
+        udp_listener.start()
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to start listener: {e}")
+
+
 def main():
-    print("Enter OBS connection details:")
-    host = input("OBS Host (default: localhost): ") or "localhost"
-    port = int(input("OBS Port (default: 4455): ") or 4455)
-    password = input("OBS Password: ")
-    default_scene = input("Default Scene (default: scene): ") or "scene"
-    default_audio_source = (
-        input("Default Audio Source (default: Desktop Audio): ") or "Desktop Audio"
+    root = tk.Tk()
+    root.title("OBS WebSocket Listener")
+
+    tk.Label(root, text="OBS Host:").grid(row=0, column=0)
+    tk.Label(root, text="OBS Port:").grid(row=1, column=0)
+    tk.Label(root, text="OBS Password:").grid(row=2, column=0)
+    tk.Label(root, text="Default Scene:").grid(row=3, column=0)
+    tk.Label(root, text="Default Audio Source:").grid(row=4, column=0)
+
+    obs_host = tk.Entry(root)
+    obs_port = tk.Entry(root)
+    obs_password = tk.Entry(root, show="*")
+    default_scene = tk.Entry(root)
+    default_audio_source = tk.Entry(root)
+
+    obs_host.grid(row=0, column=1)
+    obs_port.grid(row=1, column=1)
+    obs_password.grid(row=2, column=1)
+    default_scene.grid(row=3, column=1)
+    default_audio_source.grid(row=4, column=1)
+
+    def on_start():
+        host = obs_host.get() or "localhost"
+        port = int(obs_port.get() or 4455)
+        password = obs_password.get()
+        scene = default_scene.get() or "tela"
+        audio_source = default_audio_source.get() or "Desktop Audio"
+
+        start_listener(host, port, password, scene, audio_source)
+
+    tk.Button(root, text="Start Listener", command=on_start).grid(
+        row=5, column=0, columnspan=2
     )
 
-    obs_client = OBSWebSocketClient(host, port, password)
-    obs_client.connect()
-    obs_client.authenticate()
-
-    controller = OBSController(obs_client, default_scene, default_audio_source)
-    message_handler = MessageHandler(controller)
-
-    udp_listener = UDPListener("0.0.0.0", 12345, message_handler.handle)
-    udp_listener.start()
+    root.mainloop()
 
 
 if __name__ == "__main__":
