@@ -8,18 +8,6 @@ import json
 import socket
 import re
 
-# Variaveis que serão preenchidas pelo usuario
-OBS_HOST = "localhost"
-OBS_PORT = 4455
-OBS_PASS = "Iw5ja6Pxv6TkJICO"
-DEFAULT_SCENE = "tela"
-DEFAULT_AUDIO_SOURCE = "defaultAudioSource"
-
-# UDP Listener Configuration
-UDP_IP = "0.0.0.0"
-UDP_PORT = 12345
-
-
 class OBSWebSocketClient:
     def __init__(self, host, port, password):
         self.ws = websocket.WebSocket()
@@ -210,14 +198,23 @@ class MessageHandler:
 
 
 def main():
-    obs_client = OBSWebSocketClient(OBS_HOST, OBS_PORT, OBS_PASS)
+    print("Enter OBS connection details:")
+    host = input("OBS Host (default: localhost): ") or "localhost"
+    port = int(input("OBS Port (default: 4455): ") or 4455)
+    password = input("OBS Password: ")
+    default_scene = input("Default Scene (default: scene): ") or "scene"
+    default_audio_source = (
+        input("Default Audio Source (default: Desktop Audio): ") or "Desktop Audio"
+    )
+
+    obs_client = OBSWebSocketClient(host, port, password)
     obs_client.connect()
     obs_client.authenticate()
 
-    controller = OBSController(obs_client, DEFAULT_SCENE, DEFAULT_AUDIO_SOURCE)
+    controller = OBSController(obs_client, default_scene, default_audio_source)
     message_handler = MessageHandler(controller)
 
-    udp_listener = UDPListener(UDP_IP, UDP_PORT, message_handler.handle)
+    udp_listener = UDPListener("0.0.0.0", 12345, message_handler.handle)
     udp_listener.start()
 
 
