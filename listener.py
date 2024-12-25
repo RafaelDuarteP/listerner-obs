@@ -57,9 +57,13 @@ class OBSWebSocketClient:
         return auth
 
     def send_command(self, request):
-        self.ws.send(json.dumps(request))
-        message = self.ws.recv()
-        return json.loads(message)
+        while True:
+            try:
+                self.ws.send(json.dumps(request))
+                message = self.ws.recv()
+                return json.loads(message)
+            except Exception as e:
+                print(f"Retrying command due to error: {e}")
 
     def close(self):
         self.ws.close()
@@ -98,7 +102,6 @@ class OBSController:
         }
 
     def toggle_item_scene(self, scene_item_id):
-        op = 0
         finished = False
         while not finished:
             try:
@@ -111,8 +114,7 @@ class OBSController:
                         },
                     )
                 )
-                op = result["op"]
-                if op == 7:
+                if result["op"] == 7:
                     enabled = result["d"]["responseData"]["sceneItemEnabled"]
                     result = self.obs_client.send_command(
                         self.get_payload(
@@ -124,8 +126,7 @@ class OBSController:
                             },
                         )
                     )
-                    op = result["op"]
-                    if op == 7:
+                    if result["op"] == 7:
                         finished = True
             except Exception as e:
                 print(f"An error occurred: {e}")
