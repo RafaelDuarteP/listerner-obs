@@ -18,6 +18,7 @@ class UDPListener:
         self.thread.start()
 
     def stop(self):
+        print("Stopping UDP listener...")
         self.running = False
         if self.sock:
             self.sock.close()  # Fecha o socket para desbloquear `recvfrom`

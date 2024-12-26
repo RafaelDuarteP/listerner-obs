@@ -1,10 +1,26 @@
 import tkinter as tk
 from tkinter import messagebox
+import sys
+import queue
 
 from message_handler import MessageHandler
 from obs_client import OBSWebSocketClient
 from obs_controller import OBSController
 from udp_listener import UDPListener
+
+
+class LogRedirector:
+    def __init__(self, log_queue):
+        self.log_queue = log_queue
+
+    def write(self, message):
+        if message.strip(): 
+            self.log_queue.put(message + "\n")
+
+    def flush(self):
+        pass  
+
+
 class ListenerApp:
     def __init__(self, root):
         self.root = root
@@ -37,6 +53,28 @@ class ListenerApp:
             row=5, column=1
         )
 
+        self.log_text = tk.Text(
+            root, height=10, width=50, bg="black", fg="white", font=("Courier", 10)
+        )
+        self.log_text.grid(row=6, column=0, columnspan=2)
+
+        self.log_queue = queue.Queue()
+
+        sys.stdout = LogRedirector(self.log_queue)
+
+        self.process_log_queue()
+
+    def process_log_queue(self):
+        try:
+            while True:
+                message = self.log_queue.get_nowait()
+                self.log_text.insert(tk.END, message)
+                self.log_text.yview(tk.END) 
+        except queue.Empty:
+            pass
+
+        self.root.after(100, self.process_log_queue)
+
     def start_listener(self):
         if self.listener:
             messagebox.showwarning("Warning", "Listener is already running.")
@@ -57,19 +95,25 @@ class ListenerApp:
             message_handler = MessageHandler(controller)
 
             self.listener = UDPListener("0.0.0.0", 12345, message_handler.handle)
-            self.listener.start()
 
-            messagebox.showinfo("Info", "Listener started successfully.")
+            print("Listener started successfully.")
+            self.show_message("Info", "Listener started successfully.")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to start listener: {e}")
+            print(f"Failed to start listener: {e}")
+            self.show_message("Error", f"Failed to start listener: {e}")
 
     def stop_listener(self):
         if self.listener:
-            self.listener.stop()
+            self.listener.stop() 
             self.listener = None
-            messagebox.showinfo("Info", "Listener stopped successfully.")
+            print("Listener stopped successfully.")
+            self.show_message("Info", "Listener stopped successfully.")
         else:
-            messagebox.showwarning("Warning", "No listener is running.")
+            print("No listener is running.")
+            self.show_message("Warning", "No listener is running.")
+
+    def show_message(self, title, message):
+        self.root.after(0, lambda: messagebox.showinfo(title, message))
 
 
 if __name__ == "__main__":
