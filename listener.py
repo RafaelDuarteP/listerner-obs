@@ -9,6 +9,8 @@ import socket
 import re
 import tkinter as tk
 from tkinter import messagebox
+from threading import Thread
+import select
 
 
 class OBSWebSocketClient:
@@ -65,15 +67,39 @@ class UDPListener:
         self.ip = ip
         self.port = port
         self.handler = handler
+        self.running = False
+        self.thread = None
+        self.sock = None
 
     def start(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((self.ip, self.port))
+        self.running = True
+        self.thread = Thread(target=self._listen)
+        self.thread.start()
+
+    def stop(self):
+        self.running = False
+        if self.sock:
+            self.sock.close()  # Fecha o socket para desbloquear `recvfrom`
+        if self.thread:
+            self.thread.join()
+
+    def _listen(self):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind((self.ip, self.port))
+        self.sock.setblocking(False)  # Torna o socket não bloqueante
         print(f"UDP listener started on {self.ip}:{self.port}")
 
-        while True:
-            data, addr = sock.recvfrom(1024)
-            self.handler(data)
+        while self.running:
+            ready = select.select([self.sock], [], [], 0.5)  # Timeout de 0.5s
+            if ready[0]:
+                try:
+                    data, addr = self.sock.recvfrom(1024)
+                    self.handler(data)
+                except socket.error as e:
+                    if self.running:
+                        print(f"Socket error: {e}")
+        self.sock.close()
+        print("UDP listener stopped.")
 
 
 class OBSController:
@@ -200,58 +226,74 @@ class MessageHandler:
             print("Stopped live streaming and recording.")
 
 
-def start_listener(host, port, password, scene, audio_source):
-    try:
-        obs_client = OBSWebSocketClient(host, port, password)
-        obs_client.connect()
-        obs_client.authenticate()
+class ListenerApp:
+    def __init__(self, root):
+        self.root = root
+        self.listener = None
 
-        controller = OBSController(obs_client, scene, audio_source)
-        message_handler = MessageHandler(controller)
+        self.root.title("OBS WebSocket Listener")
 
-        udp_listener = UDPListener("0.0.0.0", 12345, message_handler.handle)
-        udp_listener.start()
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to start listener: {e}")
+        tk.Label(root, text="OBS Host:").grid(row=0, column=0)
+        tk.Label(root, text="OBS Port:").grid(row=1, column=0)
+        tk.Label(root, text="OBS Password:").grid(row=2, column=0)
+        tk.Label(root, text="Default Scene:").grid(row=3, column=0)
+        tk.Label(root, text="Default Audio Source:").grid(row=4, column=0)
 
+        self.obs_host = tk.Entry(root)
+        self.obs_port = tk.Entry(root)
+        self.obs_password = tk.Entry(root, show="*")
+        self.default_scene = tk.Entry(root)
+        self.default_audio_source = tk.Entry(root)
 
-def main():
-    root = tk.Tk()
-    root.title("OBS WebSocket Listener")
+        self.obs_host.grid(row=0, column=1)
+        self.obs_port.grid(row=1, column=1)
+        self.obs_password.grid(row=2, column=1)
+        self.default_scene.grid(row=3, column=1)
+        self.default_audio_source.grid(row=4, column=1)
 
-    tk.Label(root, text="OBS Host:").grid(row=0, column=0)
-    tk.Label(root, text="OBS Port:").grid(row=1, column=0)
-    tk.Label(root, text="OBS Password:").grid(row=2, column=0)
-    tk.Label(root, text="Default Scene:").grid(row=3, column=0)
-    tk.Label(root, text="Default Audio Source:").grid(row=4, column=0)
+        tk.Button(root, text="Start Listener", command=self.start_listener).grid(
+            row=5, column=0
+        )
+        tk.Button(root, text="Stop Listener", command=self.stop_listener).grid(
+            row=5, column=1
+        )
 
-    obs_host = tk.Entry(root)
-    obs_port = tk.Entry(root)
-    obs_password = tk.Entry(root, show="*")
-    default_scene = tk.Entry(root)
-    default_audio_source = tk.Entry(root)
+    def start_listener(self):
+        if self.listener:
+            messagebox.showwarning("Warning", "Listener is already running.")
+            return
 
-    obs_host.grid(row=0, column=1)
-    obs_port.grid(row=1, column=1)
-    obs_password.grid(row=2, column=1)
-    default_scene.grid(row=3, column=1)
-    default_audio_source.grid(row=4, column=1)
+        host = self.obs_host.get() or "localhost"
+        port = int(self.obs_port.get() or 4455)
+        password = self.obs_password.get()
+        scene = self.default_scene.get() or "tela"
+        audio_source = self.default_audio_source.get() or "Desktop Audio"
 
-    def on_start():
-        host = obs_host.get() or "localhost"
-        port = int(obs_port.get() or 4455)
-        password = obs_password.get()
-        scene = default_scene.get() or "tela"
-        audio_source = default_audio_source.get() or "Desktop Audio"
+        try:
+            obs_client = OBSWebSocketClient(host, port, password)
+            obs_client.connect()
+            obs_client.authenticate()
 
-        start_listener(host, port, password, scene, audio_source)
+            controller = OBSController(obs_client, scene, audio_source)
+            message_handler = MessageHandler(controller)
 
-    tk.Button(root, text="Start Listener", command=on_start).grid(
-        row=5, column=0, columnspan=2
-    )
+            self.listener = UDPListener("0.0.0.0", 12345, message_handler.handle)
+            self.listener.start()
 
-    root.mainloop()
+            messagebox.showinfo("Info", "Listener started successfully.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to start listener: {e}")
+
+    def stop_listener(self):
+        if self.listener:
+            self.listener.stop()
+            self.listener = None
+            messagebox.showinfo("Info", "Listener stopped successfully.")
+        else:
+            messagebox.showwarning("Warning", "No listener is running.")
 
 
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    app = ListenerApp(root)
+    root.mainloop()
