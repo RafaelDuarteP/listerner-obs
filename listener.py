@@ -33,7 +33,7 @@ class ListenerApp:
         obs_host, obs_port, obs_password, default_scene, default_audio_source = (
             self.storage_interface.load()
         )
-
+        self.root.geometry("600x600")
         self.root.title("OBS WebSocket Listener")
 
         header_frame = tk.Frame(root)
