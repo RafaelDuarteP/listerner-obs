@@ -1,5 +1,4 @@
 import re
-import json
 
 
 class MessageHandler:
@@ -42,8 +41,11 @@ class MessageHandler:
             print("Stopped live streaming and recording.")
 
         elif message == "listItems":
-            items = self.controller.list_items()
-            print("Listed items.")
-            scene_items = items["d"]["responseData"]["sceneItems"]
-            for item in scene_items:
-                print(f"{'{'}sourceName: {item['sourceName']}, sceneItemId: {item['sceneItemId']}{'}'}")
+            try:
+                items = self.controller.list_items()
+                print("Listed items.")
+                scene_items = items["d"]["responseData"]["sceneItems"]
+                for item in scene_items:
+                    print(f"{'{'}sourceName: {item['sourceName']}, sceneItemId: {item['sceneItemId']}{'}'}")
+            except Exception as e:
+                print(f"An error occurred: {e}")
