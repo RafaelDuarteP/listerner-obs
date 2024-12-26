@@ -75,6 +75,11 @@ class ListenerApp:
 
         self.process_log_queue()
 
+        for i in range(6):
+            root.grid_rowconfigure(i, weight=1)
+        root.grid_columnconfigure(0, weight=1)
+        root.grid_columnconfigure(1, weight=1)
+
     def process_log_queue(self):
         try:
             while True:

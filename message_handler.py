@@ -1,4 +1,5 @@
 import re
+import json
 
 
 class MessageHandler:
@@ -39,3 +40,10 @@ class MessageHandler:
         elif message == "stop":
             self.controller.stop()
             print("Stopped live streaming and recording.")
+
+        elif message == "listItems":
+            items = self.controller.list_items()
+            print("Listed items.")
+            scene_items = items["d"]["responseData"]["sceneItems"]
+            for item in scene_items:
+                print(f"{'{'}sourceName: {item['sourceName']}, sceneItemId: {item['sceneItemId']}{'}'}")

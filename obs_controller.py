@@ -1,3 +1,4 @@
+import json
 import uuid
 
 
@@ -30,6 +31,9 @@ class OBSController:
                         },
                     )
                 )
+                if result["d"]["requestStatus"]["code"] == 600:
+                    print("Scene item not found.")
+                    break
                 if result["op"] == 7:
                     enabled = result["d"]["responseData"]["sceneItemEnabled"]
                     result = self.obs_client.send_command(
@@ -83,3 +87,8 @@ class OBSController:
     def stop(self):
         self.obs_client.send_command(self.get_payload("StopStream", {}))
         self.obs_client.send_command(self.get_payload("StopRecord", {}))
+
+    def list_items(self):
+        return self.obs_client.send_command(
+            self.get_payload("GetSceneItemList", {"sceneName": self.default_scene})
+        )
