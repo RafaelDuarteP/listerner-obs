@@ -8,6 +8,7 @@ from obs_client import OBSWebSocketClient
 from obs_controller import OBSController
 from udp_listener import UDPListener
 from storage_interface import StorageInterface
+from datetime import datetime
 
 
 class LogRedirector:
@@ -16,7 +17,8 @@ class LogRedirector:
 
     def write(self, message):
         if message.strip():
-            self.log_queue.put(message + "\n")
+            timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S] ")
+            self.log_queue.put(timestamp + message + "\n")
 
     def flush(self):
         pass
@@ -34,11 +36,11 @@ class ListenerApp:
 
         self.root.title("OBS WebSocket Listener")
 
-        tk.Label(root, text="OBS Host:").grid(row=0, column=0)
-        tk.Label(root, text="OBS Port:").grid(row=1, column=0)
-        tk.Label(root, text="OBS Password:").grid(row=2, column=0)
-        tk.Label(root, text="Default Scene:").grid(row=3, column=0)
-        tk.Label(root, text="Default Audio Source:").grid(row=4, column=0)
+        tk.Label(root, text="OBS Host:").grid(row=0, column=0, sticky="ew")
+        tk.Label(root, text="OBS Port:").grid(row=1, column=0, sticky="ew")
+        tk.Label(root, text="OBS Password:").grid(row=2, column=0, sticky="ew")
+        tk.Label(root, text="Default Scene:").grid(row=3, column=0, sticky="ew")
+        tk.Label(root, text="Default Audio Source:").grid(row=4, column=0, sticky="ew")
 
         self.obs_host = tk.Entry(root)
         self.obs_host.insert(0, obs_host)
@@ -51,31 +53,40 @@ class ListenerApp:
         self.default_audio_source = tk.Entry(root)
         self.default_audio_source.insert(0, default_audio_source)
 
-        self.obs_host.grid(row=0, column=1)
-        self.obs_port.grid(row=1, column=1)
-        self.obs_password.grid(row=2, column=1)
-        self.default_scene.grid(row=3, column=1)
-        self.default_audio_source.grid(row=4, column=1)
+        self.obs_host.grid(row=0, column=1, sticky="ew")
+        self.obs_port.grid(row=1, column=1, sticky="ew")
+        self.obs_password.grid(row=2, column=1, sticky="ew")
+        self.default_scene.grid(row=3, column=1, sticky="ew")
+        self.default_audio_source.grid(row=4, column=1, sticky="ew")
 
-        tk.Button(root, text="Start Listener", command=self.start_listener).grid(
-            row=5, column=0
+        self.start_button = tk.Button(
+            root, text="Start Listener", command=self.start_listener
         )
-        tk.Button(root, text="Stop Listener", command=self.stop_listener).grid(
-            row=5, column=1
+        self.start_button.grid(row=5, column=0, sticky="ew")
+
+        self.stop_button = tk.Button(
+            root, text="Stop Listener", command=self.stop_listener
         )
+        self.stop_button.grid(row=5, column=1, sticky="ew")
+        self.stop_button.config(state=tk.DISABLED)
+
+        self.restart_button = tk.Button(
+            root, text="Restart Listener", command=self.restart_listener
+        )
+        self.restart_button.grid(row=6, columnspan=2, sticky="ew")
+        self.restart_button.config(state=tk.DISABLED)
 
         self.log_text = tk.Text(
-            root, height=10, width=50, bg="black", fg="white", font=("Courier", 10)
+            root, height=20, width=50, bg="black", fg="white", font=("Courier", 10)
         )
-        self.log_text.grid(row=6, column=0, columnspan=2)
+        self.log_text.grid(row=7, column=0, columnspan=2, sticky="nsew")
 
         self.log_queue = queue.Queue()
-
         sys.stdout = LogRedirector(self.log_queue)
 
         self.process_log_queue()
 
-        for i in range(6):
+        for i in range(7):
             root.grid_rowconfigure(i, weight=1)
         root.grid_columnconfigure(0, weight=1)
         root.grid_columnconfigure(1, weight=1)
@@ -96,24 +107,41 @@ class ListenerApp:
             messagebox.showwarning("Warning", "Listener is already running.")
             return
 
-        host = self.obs_host.get()
-        port = int(self.obs_port.get())
+        host = self.obs_host.get().strip()
+        port = self.obs_port.get().strip()
         password = self.obs_password.get()
-        scene = self.default_scene.get()
-        audio_source = self.default_audio_source.get()
+        scene = self.default_scene.get().strip()
+        audio_source = self.default_audio_source.get().strip()
+
+        if (
+            not host
+            or not port.isdigit()
+            or not password
+            or not scene
+            or not audio_source
+        ):
+            messagebox.showerror(
+                "Error", "All fields are required and port must be a number."
+            )
+            return
 
         self.storage_interface.save(host, port, password, scene, audio_source)
 
         try:
-            obs_client = OBSWebSocketClient(host, port, password)
-            obs_client.connect()
-            obs_client.authenticate()
+            port = int(port)  # Port convertido após validação
+            self.obs_client = OBSWebSocketClient(host, port, password)
+            self.obs_client.connect()
+            self.obs_client.authenticate()
 
-            controller = OBSController(obs_client, scene, audio_source)
+            controller = OBSController(self.obs_client, scene, audio_source)
             message_handler = MessageHandler(controller)
 
             self.listener = UDPListener("0.0.0.0", 12345, message_handler.handle)
             self.listener.start()
+
+            self.start_button.config(state=tk.DISABLED)
+            self.stop_button.config(state=tk.NORMAL)
+            self.restart_button.config(state=tk.NORMAL)
 
             print("Listener started successfully.")
             self.show_message("Info", "Listener started successfully.")
@@ -125,11 +153,28 @@ class ListenerApp:
         if self.listener:
             self.listener.stop()
             self.listener = None
+            self.obs_client.close()
+            self.obs_client = None
+
+            self.start_button.config(state=tk.NORMAL)
+            self.stop_button.config(state=tk.DISABLED)
+            self.restart_button.config(state=tk.DISABLED)
+
             print("Listener stopped successfully.")
             self.show_message("Info", "Listener stopped successfully.")
         else:
             print("No listener is running.")
             self.show_message("Warning", "No listener is running.")
+
+    def restart_listener(self):
+        print("Restarting listener...")
+        self.stop_listener()
+        self.start_listener()
+
+    def on_close(self):
+        if self.listener:
+            self.listener.stop()
+        self.root.destroy()
 
     def show_message(self, title, message):
         self.root.after(0, lambda: messagebox.showinfo(title, message))
@@ -138,4 +183,5 @@ class ListenerApp:
 if __name__ == "__main__":
     root = tk.Tk()
     app = ListenerApp(root)
+    root.protocol("WM_DELETE_WINDOW", app.on_close)  # Associa o evento de fechar janela
     root.mainloop()
