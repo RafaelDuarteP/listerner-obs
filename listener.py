@@ -95,6 +95,10 @@ class ListenerApp:
         )
         self.log_text.grid(row=8, column=0, columnspan=2, sticky="nsew")
 
+        self.clear_log_button = tk.Button(root, text="Clear Log", command=self.clear_log)
+        self.clear_log_button.grid(row=9, columnspan=2, sticky="ew", pady=5)
+
+
         self.log_queue = queue.Queue()
         sys.stdout = LogRedirector(self.log_queue)
 
@@ -108,6 +112,10 @@ class ListenerApp:
     def update_status_indicator(self, color):
         self.status_canvas.delete("all")
         self.status_canvas.create_oval(2, 2, 18, 18, fill=color)
+
+    
+    def clear_log(self):
+        self.log_text.delete(1.0, tk.END)
 
     def process_log_queue(self):
         try:
