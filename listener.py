@@ -36,11 +36,23 @@ class ListenerApp:
 
         self.root.title("OBS WebSocket Listener")
 
-        tk.Label(root, text="OBS Host:").grid(row=0, column=0, sticky="ew")
-        tk.Label(root, text="OBS Port:").grid(row=1, column=0, sticky="ew")
-        tk.Label(root, text="OBS Password:").grid(row=2, column=0, sticky="ew")
-        tk.Label(root, text="Default Scene:").grid(row=3, column=0, sticky="ew")
-        tk.Label(root, text="Default Audio Source:").grid(row=4, column=0, sticky="ew")
+        header_frame = tk.Frame(root)
+        header_frame.grid(row=0, column=0, columnspan=2, sticky="ew")
+        header_frame.grid_columnconfigure(0, weight=1)
+
+        tk.Label(header_frame, text="OBS WebSocket Listener").grid(row=0, column=0)
+        self.status_canvas = tk.Canvas(
+            header_frame, width=20, height=20, bg="white", highlightthickness=0
+        )
+        self.status_canvas.grid(row=0, column=1, padx=5)
+
+        self.update_status_indicator("red")
+
+        tk.Label(root, text="OBS Host:").grid(row=1, column=0, sticky="ew")
+        tk.Label(root, text="OBS Port:").grid(row=2, column=0, sticky="ew")
+        tk.Label(root, text="OBS Password:").grid(row=3, column=0, sticky="ew")
+        tk.Label(root, text="Default Scene:").grid(row=4, column=0, sticky="ew")
+        tk.Label(root, text="Default Audio Source:").grid(row=5, column=0, sticky="ew")
 
         self.obs_host = tk.Entry(root)
         self.obs_host.insert(0, obs_host)
@@ -53,43 +65,49 @@ class ListenerApp:
         self.default_audio_source = tk.Entry(root)
         self.default_audio_source.insert(0, default_audio_source)
 
-        self.obs_host.grid(row=0, column=1, sticky="ew")
-        self.obs_port.grid(row=1, column=1, sticky="ew")
-        self.obs_password.grid(row=2, column=1, sticky="ew")
-        self.default_scene.grid(row=3, column=1, sticky="ew")
-        self.default_audio_source.grid(row=4, column=1, sticky="ew")
+        self.obs_host.grid(row=1, column=1, sticky="ew")
+        self.obs_port.grid(row=2, column=1, sticky="ew")
+        self.obs_password.grid(row=3, column=1, sticky="ew")
+        self.default_scene.grid(row=4, column=1, sticky="ew")
+        self.default_audio_source.grid(row=5, column=1, sticky="ew")
 
+        # Botões
         self.start_button = tk.Button(
             root, text="Start Listener", command=self.start_listener
         )
-        self.start_button.grid(row=5, column=0, sticky="ew")
+        self.start_button.grid(row=6, column=0, sticky="ew")
 
         self.stop_button = tk.Button(
             root, text="Stop Listener", command=self.stop_listener
         )
-        self.stop_button.grid(row=5, column=1, sticky="ew")
+        self.stop_button.grid(row=6, column=1, sticky="ew")
         self.stop_button.config(state=tk.DISABLED)
 
         self.restart_button = tk.Button(
             root, text="Restart Listener", command=self.restart_listener
         )
-        self.restart_button.grid(row=6, columnspan=2, sticky="ew")
+        self.restart_button.grid(row=7, columnspan=2, sticky="ew")
         self.restart_button.config(state=tk.DISABLED)
 
+        # Log
         self.log_text = tk.Text(
             root, height=20, width=50, bg="black", fg="white", font=("Courier", 10)
         )
-        self.log_text.grid(row=7, column=0, columnspan=2, sticky="nsew")
+        self.log_text.grid(row=8, column=0, columnspan=2, sticky="nsew")
 
         self.log_queue = queue.Queue()
         sys.stdout = LogRedirector(self.log_queue)
 
         self.process_log_queue()
 
-        for i in range(7):
+        for i in range(8):
             root.grid_rowconfigure(i, weight=1)
         root.grid_columnconfigure(0, weight=1)
         root.grid_columnconfigure(1, weight=1)
+
+    def update_status_indicator(self, color):
+        self.status_canvas.delete("all")
+        self.status_canvas.create_oval(2, 2, 18, 18, fill=color)
 
     def process_log_queue(self):
         try:
@@ -145,6 +163,7 @@ class ListenerApp:
 
             print("Listener started successfully.")
             self.show_message("Info", "Listener started successfully.")
+            self.update_status_indicator("green")
         except Exception as e:
             print(f"Failed to start listener: {e}")
             self.show_message("Error", f"Failed to start listener: {e}")
@@ -162,6 +181,7 @@ class ListenerApp:
 
             print("Listener stopped successfully.")
             self.show_message("Info", "Listener stopped successfully.")
+            self.update_status_indicator("red")
         else:
             print("No listener is running.")
             self.show_message("Warning", "No listener is running.")
