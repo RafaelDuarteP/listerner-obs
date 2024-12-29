@@ -44,7 +44,12 @@ class OBSWebSocketClient:
         while True:
             try:
                 self.ws.send(json.dumps(request))
+                print("TRYING SEND COMMAND WITH PAYLOAD:")
+                print(json.dumps(request, indent=4))
                 message = self.ws.recv()
+                result = json.loads(message)
+                print("RESULT:")
+                print(json.dumps(result, indent=4))
                 return json.loads(message)
             except Exception as e:
                 print(f"Retrying command due to error: {e}")
