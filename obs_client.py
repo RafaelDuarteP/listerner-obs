@@ -27,6 +27,8 @@ class OBSWebSocketClient:
         }
         self.ws.send(json.dumps(payload))
         message = self.ws.recv()
+        result = json.loads(message)
+        print(json.dumps(result, ident=4))
         print("Authenticated with OBS")
 
     def _build_auth_string(self, salt, challenge):
