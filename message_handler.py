@@ -1,8 +1,10 @@
 import re
 
+from obs_controller import OBSController
+
 
 class MessageHandler:
-    def __init__(self, controller):
+    def __init__(self, controller: 'OBSController'):
         self.controller = controller
 
     def handle(self, message):
@@ -39,6 +41,26 @@ class MessageHandler:
         elif message == "stop":
             self.controller.stop()
             print("Stopped live streaming and recording.")
+        
+        elif message == "setup":
+            self.controller.setup()
+            print("Setup scene.")
+        
+        elif message == "iniciar":
+            self.controller.iniciar()
+            print("Iniciando transmissão.")
+
+        elif message == "iniciarDizimo":
+            self.controller.iniciar_dizimo()
+            print("Iniciando Dízimo.")
+
+        elif message == "finalizarDizimo":
+            self.controller.finalizar_dizimo()
+            print("Finalizando Dízimo.")
+        
+        elif message == "finalizar":
+            self.controller.finalizar()
+            print("Finalizando transmissão.")
 
         elif message == "listItems":
             try:
