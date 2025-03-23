@@ -43,7 +43,7 @@ class MessageHandler:
                 fadeOut = parts[5].lower() == 'true'
             except:
                 fadeOut = False
-            # self.controller.switch_scene(sceneName,transition,duration,mute,fadeOut)
+            self.controller.switch_scene(sceneName,transition,duration,mute,fadeOut)
             print(f"Switch to scene {sceneName} with {transition} transition")
 
         elif message == "toggleMute":
