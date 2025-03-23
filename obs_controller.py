@@ -107,12 +107,13 @@ class OBSController:
             self.get_payload("GetSceneItemList", {"sceneName": self.default_scene})
         )
 
-    def switch_scene(self, sceneName, transition, duration, mute, fadeOut):
+    def switch_scene(self, sceneName, transition, duration, mute, fadeOut, volume):
         self.obs_client.send_command(
             self.get_payload("SetCurrentPreviewScene", {"sceneName": sceneName})
         )
         self.transition(transition, duration)
         self.mute(muted=mute)
+        self.set_volume(volume)
         if fadeOut:
             self.fade_out()
             self.stop
@@ -136,6 +137,17 @@ class OBSController:
                 )
             )
             time.sleep(intervalo)
+
+    def set_volume(self, volumeDb):
+        self.obs_client.send_command(
+            self.get_payload(
+                "SetInputVolume",
+                {
+                    "inputName": self.default_audio_source,
+                    "inputVolumeDb": volumeDb,
+                },
+            )
+        )
 
     def mute(self, muted):
         self.obs_client.send_command(
