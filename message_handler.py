@@ -12,6 +12,7 @@ class MessageHandler:
 
         match_toggle_item = re.match(r"toggleItem(\d+)", message)
         match_transition = re.match(r"transition([a-zA-Z]+)(\d+)", message)
+        match_scene = re.match(r"^scene.*", message)
 
         if match_toggle_item:
             scene_item_id = int(match_toggle_item.group(1))
@@ -25,6 +26,25 @@ class MessageHandler:
             print(
                 f"Transition {match_transition.group(1)} with {match_transition.group(2)}"
             )
+        
+        elif match_scene:
+            parts = message.split()
+            sceneName = parts[1]
+            transition = parts[2]
+            try:
+                duration = int(parts[3])
+            except:
+                duration = 0
+            try:
+                mute = parts[4].lower() == 'true'
+            except:
+                mute = False
+            try:
+                fadeOut = parts[5].lower() == 'true'
+            except:
+                fadeOut = False
+            # self.controller.switch_scene(sceneName,transition,duration,mute,fadeOut)
+            print(f"Switch to scene {sceneName} with {transition} transition")
 
         elif message == "toggleMute":
             self.controller.toggle_mute()

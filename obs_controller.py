@@ -107,6 +107,47 @@ class OBSController:
             self.get_payload("GetSceneItemList", {"sceneName": self.default_scene})
         )
 
+    def switch_scene(self, sceneName, transition, duration, mute, fadeOut):
+        self.obs_client.send_command(
+            self.get_payload("SetCurrentPreviewScene", {"sceneName": sceneName})
+        )
+        self.transition(transition, duration)
+        self.mute(muted=mute)
+        if fadeOut:
+            self.fade_out()
+            self.stop
+
+
+    def fade_out(self):
+        inicio_db = 0
+        fim_db = -50
+        duracao = 15
+        passos = 600
+        intervalo = duracao / passos
+        for i in range(passos + 1):
+            volume_db = inicio_db + (fim_db - inicio_db) * (i / passos)
+            self.obs_client.send_command(
+                self.get_payload(
+                    "SetInputVolume",
+                    {
+                        "inputName": self.default_audio_source,
+                        "inputVolumeDb": volume_db,
+                    },
+                )
+            )
+            time.sleep(intervalo)
+
+    def mute(self, muted):
+        self.obs_client.send_command(
+            self.get_payload(
+                "SetInputMute",
+                {
+                    "inputName": self.default_audio_source,
+                    "inputMuted": muted,
+                },
+            )
+        )
+
     def setup(self):
         self.obs_client.send_command(
             self.get_payload(
@@ -366,21 +407,5 @@ class OBSController:
             )
         )
         self.transition("Esmaecer", 10000)
-        inicio_db = 0
-        fim_db = -50
-        duracao = 15
-        passos = 600
-        intervalo = duracao / passos
-        for i in range(passos + 1):
-            volume_db = inicio_db + (fim_db - inicio_db) * (i / passos)
-            self.obs_client.send_command(
-                self.get_payload(
-                    "SetInputVolume",
-                    {
-                        "inputName": self.default_audio_source,
-                        "inputVolumeDb": volume_db,
-                    },
-                )
-            )
-            time.sleep(intervalo)
+        self.fade_out()
         self.stop()
