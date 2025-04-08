@@ -24,18 +24,119 @@ class LogRedirector:
         pass
 
 
+class ConfigPopup:
+    def __init__(self, parent, storage_interface):
+        self.window = Toplevel(parent)
+        self.window.title("Configurar Entradas")
+        self.window.geometry("350x400")
+        self.entries = {}
+        self.storage = storage_interface
+
+        labels = [
+            "OBS Host",
+            "OBS Port",
+            "OBS Password",
+            "Default Scene",
+            "Default Audio Source",
+            "Camera id",
+            "Previa id",
+            "Final id",
+            "Dizimo id",
+        ]
+        saved = self.storage.load()
+
+        for idx, label in enumerate(labels):
+            tk.Label(self.window, text=label).grid(row=idx, column=0, sticky="e")
+            entry = tk.Entry(self.window, show="*" if "Password" in label else "")
+            entry.insert(0, saved[idx])
+            entry.grid(row=idx, column=1, columnspan=2, sticky="ew")
+            self.entries[label] = entry
+
+        save_btn = tk.Button(self.window, text="Salvar", command=self.save_config)
+        save_btn.grid(row=len(labels), columnspan=3, pady=10)
+
+    def save_config(self):
+        values = [e.get().strip() for e in self.entries.values()]
+        if not all(values) or not values[1].isdigit():
+            messagebox.showerror(
+                "Erro", "Todos os campos são obrigatórios e a porta deve ser numérica."
+            )
+            return
+        self.storage.save(*values)
+        messagebox.showinfo("Salvo", "Configurações salvas.")
+        self.window.destroy()
+
+
+class CommandDocsPopup:
+    @staticmethod
+    def show(root):
+        doc = """
+Comandos que o Listener aceita via UDP:
+
+• toggleItem<ID>
+- Alterna visibilidade de um item na cena principal pela ID. Ex: toggleItem42
+
+• transition<NOME><DURAÇÃO>
+- Faz transição com nome e duração. Ex: transitionfade1000
+
+• scene <nome> <transição> <duração> <mute> <fadeOut> <volume>
+- Troca para uma cena com parâmetros opcionais. Ex: scene Cena1 fade 1000 true true 70
+
+• toggleMute
+- Alterna o mute da fonte de áudio padrão
+
+• startRecord
+- Inicia gravação
+
+• startLive
+- Inicia transmissão ao vivo
+
+• stop
+- Encerra gravação e transmissão
+
+• setup
+- Executa setup inicial
+
+• iniciar
+- Inicia transmissão padrão
+
+• iniciarDizimo
+- Inicia modo dízimo
+
+• finalizarDizimo
+- Finaliza modo dízimo
+
+• finalizar
+- Finaliza transmissão
+
+• listItems
+- Lista os itens da cena atual com sourceName e sceneItemId
+"""
+        top = Toplevel(root)
+        top.title("Comandos Disponíveis")
+        top.geometry("600x500")
+        top.transient(root)
+        top.grab_set()
+
+        text = tk.Text(top, wrap="word", bg="black", fg="white", font=("Courier", 10))
+        text.insert(tk.END, doc)
+        text.config(state="disabled")
+        text.pack(expand=True, fill="both")
+
+
 class ListenerApp:
     def __init__(self, root):
         self.root = root
         self.root.geometry("600x600")
         self.root.title("OBS WebSocket Listener")
+
         self.listener = None
         self.obs_client = None
-        self.storage_interface = StorageInterface()
+        self.storage = StorageInterface()
         self.log_queue = queue.Queue()
 
         self.build_menu()
-        self.build_main_ui()
+        self.build_ui()
 
         sys.stdout = LogRedirector(self.log_queue)
         self.process_log_queue()
@@ -45,16 +146,21 @@ class ListenerApp:
         self.root.config(menu=menubar)
 
         file_menu = Menu(menubar, tearoff=0)
-        file_menu.add_command(label="Configurar Entradas", command=self.show_config_popup)
+        file_menu.add_command(
+            label="Configurar Entradas", command=self.show_config_popup
+        )
         file_menu.add_separator()
         file_menu.add_command(label="Sair", command=self.root.quit)
         menubar.add_cascade(label="Arquivo", menu=file_menu)
 
         help_menu = Menu(menubar, tearoff=0)
-        help_menu.add_command(label="Comandos Disponíveis", command=self.show_command_docs)
+        help_menu.add_command(
+            label="Comandos Disponíveis",
+            command=lambda: CommandDocsPopup.show(self.root),
+        )
         menubar.add_cascade(label="Ajuda", menu=help_menu)
 
-    def build_main_ui(self):
+    def build_ui(self):
         header = tk.Frame(self.root)
         header.pack(pady=10)
 
@@ -65,7 +171,6 @@ class ListenerApp:
         self.status_canvas.pack(side=tk.LEFT, padx=10)
         self.update_status_indicator("red")
 
-        # Botões
         self.start_button = tk.Button(
             self.root, text="Iniciar o Listener", command=self.start_listener
         )
@@ -87,14 +192,13 @@ class ListenerApp:
         )
         self.restart_button.pack(fill=tk.X, padx=10)
 
-        # Log
         self.log_text = tk.Text(
             self.root, height=20, bg="black", fg="white", font=("Courier", 10)
         )
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         self.clear_log_button = tk.Button(
-            self.root, text="Clear Log", command=self.clear_log
+            self.root, text="Limpar Log", command=self.clear_log
         )
         self.clear_log_button.pack(fill=tk.X, padx=10, pady=(0, 10))
 
@@ -116,100 +220,7 @@ class ListenerApp:
         self.root.after(100, self.process_log_queue)
 
     def show_config_popup(self):
-        config_window = Toplevel(self.root)
-        config_window.title("Configurar Entradas")
-        config_window.geometry("350x400")
-
-        labels = [
-            "OBS Host",
-            "OBS Port",
-            "OBS Password",
-            "Default Scene",
-            "Default Audio Source",
-            "Camera id",
-            "Previa id",
-            "Final id",
-            "Dizimo id",
-        ]
-        self.entries = {}
-        saved = self.storage_interface.load()
-
-        for idx, label in enumerate(labels):
-            tk.Label(config_window, text=label).grid(row=idx, column=0, sticky="e")
-            entry = tk.Entry(config_window, show="*" if "Password" in label else "")
-            entry.insert(0, saved[idx])
-            entry.grid(row=idx, column=1, columnspan=2, sticky="ew")
-            self.entries[label] = entry
-
-        def save_config():
-            values = [e.get().strip() for e in self.entries.values()]
-            if not all(values) or not values[1].isdigit():
-                messagebox.showerror(
-                    "Erro",
-                    "Todos os campos são obrigatórios e a porta deve ser numérica.",
-                )
-                return
-            self.storage_interface.save(*values)
-            messagebox.showinfo("Salvo", "Configurações salvas.")
-            config_window.destroy()
-
-        save_btn = tk.Button(config_window, text="Salvar", command=save_config)
-        save_btn.grid(row=len(labels), columnspan=3, pady=10)
-
-    def show_command_docs(self):
-        doc = """
-    Comandos que o Listener aceita via UDP:
-
-    • toggleItem<ID>
-    - Alterna visibilidade de um item na cena principal pela ID. Ex: toggleItem42
-
-    • transition<NOME><DURAÇÃO>
-    - Faz transição com nome e duração. Ex: transitionfade1000
-
-    • scene <nome> <transição> <duração> <mute> <fadeOut> <volume>
-    - Troca para uma cena com parâmetros opcionais. Ex: scene Cena1 fade 1000 true true 70
-
-    • toggleMute
-    - Alterna o mute da fonte de áudio padrão
-
-    • startRecord
-    - Inicia gravação
-
-    • startLive
-    - Inicia transmissão ao vivo
-
-    • stop
-    - Encerra gravação e transmissão
-
-    • setup
-    - Executa setup inicial
-
-    • iniciar
-    - Inicia transmissão padrão
-
-    • iniciarDizimo
-    - Inicia modo dízimo
-
-    • finalizarDizimo
-    - Finaliza modo dízimo
-
-    • finalizar
-    - Finaliza transmissão
-
-    • listItems
-    - Lista os itens da cena atual com sourceName e sceneItemId
-    """
-        top = tk.Toplevel(self.root)
-        top.title("Comandos Disponíveis")
-        top.geometry("600x500")
-        top.transient(self.root)
-        top.grab_set()
-
-        text = tk.Text(top, wrap="word", bg="black", fg="white", font=("Courier", 10))
-        text.insert(tk.END, doc)
-        text.config(state="disabled")
-        text.pack(expand=True, fill="both")
-
+        ConfigPopup(self.root, self.storage)
 
     def start_listener(self):
         if self.listener:
@@ -217,6 +228,9 @@ class ListenerApp:
             return
 
         try:
+            config = self.storage.load()
+            if len(config) != 9:
+                raise ValueError("Configuração inválida: Esperado exatamente 9 valores.")
             (
                 host,
                 port,
@@ -227,7 +241,7 @@ class ListenerApp:
                 previa_id,
                 final_id,
                 dizimo_id,
-            ) = self.storage_interface.load()
+            ) = config
             port = int(port)
 
             self.obs_client = OBSWebSocketClient(host, port, password)
