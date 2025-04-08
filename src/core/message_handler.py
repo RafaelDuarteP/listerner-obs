@@ -1,6 +1,6 @@
 import re
 
-from obs_controller import OBSController
+from core.obs_controller import OBSController
 
 
 class MessageHandler:

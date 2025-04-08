@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "obs-listener"
+version = "0.1.0"
+description = "Listener UDP integrado ao OBS via WebSocket"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Seu Nome", email = "seu@email.com" }]
+dependencies = []
+
+[project.scripts]
+obs-listener = "main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

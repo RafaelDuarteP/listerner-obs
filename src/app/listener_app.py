@@ -3,14 +3,14 @@ from tkinter import messagebox, Menu, Toplevel
 import sys
 import queue
 
-from message_handler import MessageHandler
-from obs_client import OBSWebSocketClient
-from obs_controller import OBSController
-from udp_listener import UDPListener
-from storage_interface import StorageInterface
-from command_docs import CommandDocsPopup
-from config_popup import ConfigPopup
-from log_redirector import LogRedirector
+from core.message_handler import MessageHandler
+from core.obs_client import OBSWebSocketClient
+from core.obs_controller import OBSController
+from core.udp_listener import UDPListener
+from core.storage_interface import StorageInterface
+from app.command_docs import CommandDocsPopup
+from app.config_popup import ConfigPopup
+from app.log_redirector import LogRedirector
 
 
 class ListenerApp:

@@ -30,11 +30,10 @@ jobs:
 
     - name: Build executable
       run: |
-        pyinstaller --onefile --hidden-import=websocket --noconsole main.py
-
+        pyinstaller --onefile --hidden-import=websocket --noconsole --paths src src/main.py
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: listener-executable
-        path: dist/listener.exe
+        path: dist/main.exe
