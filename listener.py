@@ -1,14 +1,14 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, Menu, Toplevel
 import sys
 import queue
+from datetime import datetime
 
 from message_handler import MessageHandler
 from obs_client import OBSWebSocketClient
 from obs_controller import OBSController
 from udp_listener import UDPListener
 from storage_interface import StorageInterface
-from datetime import datetime
 
 
 class LogRedirector:
@@ -26,103 +26,77 @@ class LogRedirector:
 
 class ListenerApp:
     def __init__(self, root):
-        self.storage_interface = StorageInterface()
         self.root = root
-        self.listener = None
-
-        obs_host, obs_port, obs_password, default_scene, default_audio_source, camera_id, previa_id, final_id, dizimo_id = (
-            self.storage_interface.load()
-        )
-        self.root.geometry("600x700")
+        self.root.geometry("600x600")
         self.root.title("OBS WebSocket Listener")
+        self.listener = None
+        self.obs_client = None
+        self.storage_interface = StorageInterface()
+        self.log_queue = queue.Queue()
 
-        header_frame = tk.Frame(root)
-        header_frame.grid(row=0, column=0, columnspan=2, sticky="ew")
-        header_frame.grid_columnconfigure(0, weight=1)
+        self.build_menu()
+        self.build_main_ui()
 
-        tk.Label(header_frame, text="OBS WebSocket Listener").grid(row=0, column=0)
+        sys.stdout = LogRedirector(self.log_queue)
+        self.process_log_queue()
+
+    def build_menu(self):
+        menubar = Menu(self.root)
+        self.root.config(menu=menubar)
+
+        file_menu = Menu(menubar, tearoff=0)
+        file_menu.add_command(label="Configurar Entradas", command=self.show_config_popup)
+        file_menu.add_separator()
+        file_menu.add_command(label="Sair", command=self.root.quit)
+        menubar.add_cascade(label="Arquivo", menu=file_menu)
+
+        help_menu = Menu(menubar, tearoff=0)
+        help_menu.add_command(label="Comandos Disponíveis", command=self.show_command_docs)
+        menubar.add_cascade(label="Ajuda", menu=help_menu)
+
+    def build_main_ui(self):
+        header = tk.Frame(self.root)
+        header.pack(pady=10)
+
+        tk.Label(header, text="OBS WebSocket Listener").pack(side=tk.LEFT)
         self.status_canvas = tk.Canvas(
-            header_frame, width=20, height=20, bg="white", highlightthickness=0
+            header, width=20, height=20, bg="white", highlightthickness=0
         )
-        self.status_canvas.grid(row=0, column=1, padx=5)
-
+        self.status_canvas.pack(side=tk.LEFT, padx=10)
         self.update_status_indicator("red")
-
-        tk.Label(root, text="OBS Host:").grid(row=1, column=0, sticky="ew")
-        tk.Label(root, text="OBS Port:").grid(row=2, column=0, sticky="ew")
-        tk.Label(root, text="OBS Password:").grid(row=3, column=0, sticky="ew")
-        tk.Label(root, text="Default Scene:").grid(row=4, column=0, sticky="ew")
-        tk.Label(root, text="Default Audio Source:").grid(row=5, column=0, sticky="ew")
-        tk.Label(root, text="Camera id:").grid(row=6, column=0, sticky="ew")
-        tk.Label(root, text="Previa id:").grid(row=7, column=0, sticky="ew")
-        tk.Label(root, text="Final id:").grid(row=8, column=0, sticky="ew")
-        tk.Label(root, text="Dizimo id:").grid(row=9, column=0, sticky="ew")
-
-        self.obs_host = tk.Entry(root)
-        self.obs_host.insert(0, obs_host)
-        self.obs_port = tk.Entry(root)
-        self.obs_port.insert(0, obs_port)
-        self.obs_password = tk.Entry(root, show="*")
-        self.obs_password.insert(0, obs_password)
-        self.default_scene = tk.Entry(root)
-        self.default_scene.insert(0, default_scene)
-        self.default_audio_source = tk.Entry(root)
-        self.default_audio_source.insert(0, default_audio_source)
-        self.camera_id = tk.Entry(root)
-        self.camera_id.insert(0, camera_id)
-        self.previa_id = tk.Entry(root)
-        self.previa_id.insert(0, previa_id)
-        self.final_id = tk.Entry(root)
-        self.final_id.insert(0, final_id)
-        self.dizimo_id = tk.Entry(root)
-        self.dizimo_id.insert(0, dizimo_id)
-
-        self.obs_host.grid(row=1, column=1, sticky="ew")
-        self.obs_port.grid(row=2, column=1, sticky="ew")
-        self.obs_password.grid(row=3, column=1, sticky="ew")
-        self.default_scene.grid(row=4, column=1, sticky="ew")
-        self.default_audio_source.grid(row=5, column=1, sticky="ew")
-        self.camera_id.grid(row=6, column=1, sticky="ew")
-        self.previa_id.grid(row=7, column=1, sticky="ew")
-        self.final_id.grid(row=8, column=1, sticky="ew")
-        self.dizimo_id.grid(row=9, column=1, sticky="ew")
 
         # Botões
         self.start_button = tk.Button(
-            root, text="Start Listener", command=self.start_listener
+            self.root, text="Iniciar o Listener", command=self.start_listener
         )
-        self.start_button.grid(row=10, column=0, sticky="ew")
+        self.start_button.pack(fill=tk.X, padx=10)
 
         self.stop_button = tk.Button(
-            root, text="Stop Listener", command=self.stop_listener
+            self.root,
+            text="Parar o Listener",
+            command=self.stop_listener,
+            state=tk.DISABLED,
         )
-        self.stop_button.grid(row=10, column=1, sticky="ew")
-        self.stop_button.config(state=tk.DISABLED)
+        self.stop_button.pack(fill=tk.X, padx=10)
 
         self.restart_button = tk.Button(
-            root, text="Restart Listener", command=self.restart_listener
+            self.root,
+            text="Reiniciar o Listener",
+            command=self.restart_listener,
+            state=tk.DISABLED,
         )
-        self.restart_button.grid(row=11, columnspan=2, sticky="ew")
-        self.restart_button.config(state=tk.DISABLED)
+        self.restart_button.pack(fill=tk.X, padx=10)
 
         # Log
         self.log_text = tk.Text(
-            root, height=20, width=50, bg="black", fg="white", font=("Courier", 10)
+            self.root, height=20, bg="black", fg="white", font=("Courier", 10)
         )
-        self.log_text.grid(row=12, column=0, columnspan=2, sticky="nsew")
+        self.log_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        self.clear_log_button = tk.Button(root, text="Clear Log", command=self.clear_log)
-        self.clear_log_button.grid(row=13, columnspan=2, sticky="ew", pady=5)
-
-        self.log_queue = queue.Queue()
-        sys.stdout = LogRedirector(self.log_queue)
-
-        self.process_log_queue()
-
-        for i in range(14):
-            root.grid_rowconfigure(i, weight=1)
-        root.grid_columnconfigure(0, weight=1)
-        root.grid_columnconfigure(1, weight=1)
+        self.clear_log_button = tk.Button(
+            self.root, text="Clear Log", command=self.clear_log
+        )
+        self.clear_log_button.pack(fill=tk.X, padx=10, pady=(0, 10))
 
     def update_status_indicator(self, color):
         self.status_canvas.delete("all")
@@ -139,49 +113,136 @@ class ListenerApp:
                 self.log_text.yview(tk.END)
         except queue.Empty:
             pass
-
         self.root.after(100, self.process_log_queue)
+
+    def show_config_popup(self):
+        config_window = Toplevel(self.root)
+        config_window.title("Configurar Entradas")
+        config_window.geometry("350x400")
+
+        labels = [
+            "OBS Host",
+            "OBS Port",
+            "OBS Password",
+            "Default Scene",
+            "Default Audio Source",
+            "Camera id",
+            "Previa id",
+            "Final id",
+            "Dizimo id",
+        ]
+        self.entries = {}
+        saved = self.storage_interface.load()
+
+        for idx, label in enumerate(labels):
+            tk.Label(config_window, text=label).grid(row=idx, column=0, sticky="e")
+            entry = tk.Entry(config_window, show="*" if "Password" in label else "")
+            entry.insert(0, saved[idx])
+            entry.grid(row=idx, column=1, columnspan=2, sticky="ew")
+            self.entries[label] = entry
+
+        def save_config():
+            values = [e.get().strip() for e in self.entries.values()]
+            if not all(values) or not values[1].isdigit():
+                messagebox.showerror(
+                    "Erro",
+                    "Todos os campos são obrigatórios e a porta deve ser numérica.",
+                )
+                return
+            self.storage_interface.save(*values)
+            messagebox.showinfo("Salvo", "Configurações salvas.")
+            config_window.destroy()
+
+        save_btn = tk.Button(config_window, text="Salvar", command=save_config)
+        save_btn.grid(row=len(labels), columnspan=3, pady=10)
+
+    def show_command_docs(self):
+        doc = """
+    Comandos que o Listener aceita via UDP:
+
+    • toggleItem<ID>
+    - Alterna visibilidade de um item na cena principal pela ID. Ex: toggleItem42
+
+    • transition<NOME><DURAÇÃO>
+    - Faz transição com nome e duração. Ex: transitionfade1000
+
+    • scene <nome> <transição> <duração> <mute> <fadeOut> <volume>
+    - Troca para uma cena com parâmetros opcionais. Ex: scene Cena1 fade 1000 true true 70
+
+    • toggleMute
+    - Alterna o mute da fonte de áudio padrão
+
+    • startRecord
+    - Inicia gravação
+
+    • startLive
+    - Inicia transmissão ao vivo
+
+    • stop
+    - Encerra gravação e transmissão
+
+    • setup
+    - Executa setup inicial
+
+    • iniciar
+    - Inicia transmissão padrão
+
+    • iniciarDizimo
+    - Inicia modo dízimo
+
+    • finalizarDizimo
+    - Finaliza modo dízimo
+
+    • finalizar
+    - Finaliza transmissão
+
+    • listItems
+    - Lista os itens da cena atual com sourceName e sceneItemId
+    """
+        top = tk.Toplevel(self.root)
+        top.title("Comandos Disponíveis")
+        top.geometry("600x500")
+        top.transient(self.root)
+        top.grab_set()
+
+        text = tk.Text(top, wrap="word", bg="black", fg="white", font=("Courier", 10))
+        text.insert(tk.END, doc)
+        text.config(state="disabled")
+        text.pack(expand=True, fill="both")
+
 
     def start_listener(self):
         if self.listener:
-            messagebox.showwarning("Warning", "Listener is already running.")
+            messagebox.showwarning("Aviso", "Listener já está em execução.")
             return
-
-        host = self.obs_host.get().strip()
-        port = self.obs_port.get().strip()
-        password = self.obs_password.get()
-        scene = self.default_scene.get().strip()
-        audio_source = self.default_audio_source.get().strip()
-        camera_id = self.camera_id.get().strip()
-        previa_id = self.previa_id.get().strip()
-        final_id = self.final_id.get().strip()
-        dizimo_id = self.dizimo_id.get().strip()
-
-        if (
-            not host
-            or not port.isdigit()
-            or not password
-            or not scene
-            or not audio_source
-            or not camera_id.isdigit()
-            or not previa_id.isdigit()
-            or not final_id.isdigit()
-            or not dizimo_id.isdigit()
-        ):
-            messagebox.showerror(
-                "Error", "All fields are required and port must be a number."
-            )
-            return
-
-        self.storage_interface.save(host, port, password, scene, audio_source, camera_id, previa_id, final_id, dizimo_id)
 
         try:
-            port = int(port)  # Port convertido após validação
+            (
+                host,
+                port,
+                password,
+                scene,
+                audio_source,
+                camera_id,
+                previa_id,
+                final_id,
+                dizimo_id,
+            ) = self.storage_interface.load()
+            port = int(port)
+
             self.obs_client = OBSWebSocketClient(host, port, password)
             self.obs_client.connect()
             self.obs_client.authenticate()
 
-            controller = OBSController(self.obs_client, scene, audio_source, int(camera_id), int(previa_id), int(final_id), int(dizimo_id))
+            controller = OBSController(
+                self.obs_client,
+                scene,
+                audio_source,
+                int(camera_id),
+                int(previa_id),
+                int(final_id),
+                int(dizimo_id),
+            )
             message_handler = MessageHandler(controller)
 
             self.listener = UDPListener("0.0.0.0", 12345, message_handler.handle)
@@ -190,48 +251,44 @@ class ListenerApp:
             self.start_button.config(state=tk.DISABLED)
             self.stop_button.config(state=tk.NORMAL)
             self.restart_button.config(state=tk.NORMAL)
-
-            print("Listener started successfully.")
-            self.show_message("Info", "Listener started successfully.")
             self.update_status_indicator("green")
+            print("Listener started.")
         except Exception as e:
-            print(f"Failed to start listener: {e}")
-            self.show_message("Error", f"Failed to start listener: {e}")
+            print(f"Erro ao iniciar o listener: {e}")
+            self.show_message("Erro", str(e))
 
     def stop_listener(self):
         if self.listener:
             self.listener.stop()
             self.listener = None
-            self.obs_client.close()
-            self.obs_client = None
+            if self.obs_client:
+                self.obs_client.close()
+                self.obs_client = None
 
             self.start_button.config(state=tk.NORMAL)
             self.stop_button.config(state=tk.DISABLED)
             self.restart_button.config(state=tk.DISABLED)
-
-            print("Listener stopped successfully.")
-            self.show_message("Info", "Listener stopped successfully.")
             self.update_status_indicator("red")
+            print("Listener parado.")
         else:
-            print("No listener is running.")
-            self.show_message("Warning", "No listener is running.")
+            print("Nenhum listener em execução.")
 
     def restart_listener(self):
-        print("Restarting listener...")
+        print("Reiniciando listener...")
         self.stop_listener()
         self.start_listener()
+
+    def show_message(self, title, message):
+        self.root.after(0, lambda: messagebox.showinfo(title, message))
 
     def on_close(self):
         if self.listener:
             self.listener.stop()
         self.root.destroy()
 
-    def show_message(self, title, message):
-        self.root.after(0, lambda: messagebox.showinfo(title, message))
-
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = ListenerApp(root)
-    root.protocol("WM_DELETE_WINDOW", app.on_close)  # Associa o evento de fechar janela
+    root.protocol("WM_DELETE_WINDOW", app.on_close)
     root.mainloop()

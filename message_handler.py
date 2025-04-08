@@ -4,7 +4,7 @@ from obs_controller import OBSController
 
 
 class MessageHandler:
-    def __init__(self, controller: 'OBSController'):
+    def __init__(self, controller: "OBSController"):
         self.controller = controller
 
     def handle(self, message):
@@ -26,7 +26,7 @@ class MessageHandler:
             print(
                 f"Transition {match_transition.group(1)} with {match_transition.group(2)}"
             )
-        
+
         elif match_scene:
             parts = message.split()
             sceneName = parts[1]
@@ -36,18 +36,20 @@ class MessageHandler:
             except:
                 duration = 0
             try:
-                mute = parts[4].lower() == 'true'
+                mute = parts[4].lower() == "true"
             except:
                 mute = False
             try:
-                fadeOut = parts[5].lower() == 'true'
+                fadeOut = parts[5].lower() == "true"
             except:
                 fadeOut = False
             try:
                 volume = int(parts[6])
             except:
                 volume = 0
-            self.controller.switch_scene(sceneName,transition,duration,mute,fadeOut,volume)
+            self.controller.switch_scene(
+                sceneName, transition, duration, mute, fadeOut, volume
+            )
             print(f"Switch to scene {sceneName} with {transition} transition")
 
         elif message == "toggleMute":
@@ -65,11 +67,11 @@ class MessageHandler:
         elif message == "stop":
             self.controller.stop()
             print("Stopped live streaming and recording.")
-        
+
         elif message == "setup":
             self.controller.setup()
             print("Setup scene.")
-        
+
         elif message == "iniciar":
             self.controller.iniciar()
             print("Iniciando transmissão.")
@@ -81,7 +83,7 @@ class MessageHandler:
         elif message == "finalizarDizimo":
             self.controller.finalizar_dizimo()
             print("Finalizando Dízimo.")
-        
+
         elif message == "finalizar":
             self.controller.finalizar()
             print("Finalizando transmissão.")
@@ -92,6 +94,8 @@ class MessageHandler:
                 print("Listed items.")
                 scene_items = items["d"]["responseData"]["sceneItems"]
                 for item in scene_items:
-                    print(f"{'{'}sourceName: {item['sourceName']}, sceneItemId: {item['sceneItemId']}{'}'}")
+                    print(
+                        f"{'{'}sourceName: {item['sourceName']}, sceneItemId: {item['sceneItemId']}{'}'}"
+                    )
             except Exception as e:
                 print(f"An error occurred: {e}")
