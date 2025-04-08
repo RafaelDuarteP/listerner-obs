@@ -30,7 +30,7 @@ jobs:
 
     - name: Build executable
       run: |
-        pyinstaller --onefile --hidden-import=websocket --noconsole listener.py
+        pyinstaller --onefile --hidden-import=websocket --noconsole main.py
 
 
     - name: Upload artifact

@@ -2,126 +2,15 @@ import tkinter as tk
 from tkinter import messagebox, Menu, Toplevel
 import sys
 import queue
-from datetime import datetime
 
 from message_handler import MessageHandler
 from obs_client import OBSWebSocketClient
 from obs_controller import OBSController
 from udp_listener import UDPListener
 from storage_interface import StorageInterface
-
-
-class LogRedirector:
-    def __init__(self, log_queue):
-        self.log_queue = log_queue
-
-    def write(self, message):
-        if message.strip():
-            timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S] ")
-            self.log_queue.put(timestamp + message + "\n")
-
-    def flush(self):
-        pass
-
-
-class ConfigPopup:
-    def __init__(self, parent, storage_interface):
-        self.window = Toplevel(parent)
-        self.window.title("Configurar Entradas")
-        self.window.geometry("350x400")
-        self.entries = {}
-        self.storage = storage_interface
-
-        labels = [
-            "OBS Host",
-            "OBS Port",
-            "OBS Password",
-            "Default Scene",
-            "Default Audio Source",
-            "Camera id",
-            "Previa id",
-            "Final id",
-            "Dizimo id",
-        ]
-        saved = self.storage.load()
-
-        for idx, label in enumerate(labels):
-            tk.Label(self.window, text=label).grid(row=idx, column=0, sticky="e")
-            entry = tk.Entry(self.window, show="*" if "Password" in label else "")
-            entry.insert(0, saved[idx])
-            entry.grid(row=idx, column=1, columnspan=2, sticky="ew")
-            self.entries[label] = entry
-
-        save_btn = tk.Button(self.window, text="Salvar", command=self.save_config)
-        save_btn.grid(row=len(labels), columnspan=3, pady=10)
-
-    def save_config(self):
-        values = [e.get().strip() for e in self.entries.values()]
-        if not all(values) or not values[1].isdigit():
-            messagebox.showerror(
-                "Erro", "Todos os campos são obrigatórios e a porta deve ser numérica."
-            )
-            return
-        self.storage.save(*values)
-        messagebox.showinfo("Salvo", "Configurações salvas.")
-        self.window.destroy()
-
-
-class CommandDocsPopup:
-    @staticmethod
-    def show(root):
-        doc = """
-Comandos que o Listener aceita via UDP:
-
-• toggleItem<ID>
-- Alterna visibilidade de um item na cena principal pela ID. Ex: toggleItem42
-
-• transition<NOME><DURAÇÃO>
-- Faz transição com nome e duração. Ex: transitionfade1000
-
-• scene <nome> <transição> <duração> <mute> <fadeOut> <volume>
-- Troca para uma cena com parâmetros opcionais. Ex: scene Cena1 fade 1000 true true 70
-
-• toggleMute
-- Alterna o mute da fonte de áudio padrão
-
-• startRecord
-- Inicia gravação
-
-• startLive
-- Inicia transmissão ao vivo
-
-• stop
-- Encerra gravação e transmissão
-
-• setup
-- Executa setup inicial
-
-• iniciar
-- Inicia transmissão padrão
-
-• iniciarDizimo
-- Inicia modo dízimo
-
-• finalizarDizimo
-- Finaliza modo dízimo
-
-• finalizar
-- Finaliza transmissão
-
-• listItems
-- Lista os itens da cena atual com sourceName e sceneItemId
-"""
-        top = Toplevel(root)
-        top.title("Comandos Disponíveis")
-        top.geometry("600x500")
-        top.transient(root)
-        top.grab_set()
-
-        text = tk.Text(top, wrap="word", bg="black", fg="white", font=("Courier", 10))
-        text.insert(tk.END, doc)
-        text.config(state="disabled")
-        text.pack(expand=True, fill="both")
+from command_docs import CommandDocsPopup
+from config_popup import ConfigPopup
+from log_redirector import LogRedirector
 
 
 class ListenerApp:
@@ -299,10 +188,3 @@ class ListenerApp:
         if self.listener:
             self.listener.stop()
         self.root.destroy()
-
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = ListenerApp(root)
-    root.protocol("WM_DELETE_WINDOW", app.on_close)
-    root.mainloop()
