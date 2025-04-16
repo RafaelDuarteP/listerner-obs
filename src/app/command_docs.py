@@ -11,10 +11,17 @@ Comandos que o Listener aceita via UDP:
 - Alterna visibilidade de um item na cena principal pela ID. Ex: toggleItem42
 
 • transition<NOME><DURAÇÃO>
-- Faz transição com nome e duração. Ex: transitionfade1000
+- Faz transição com nome e duração. Ex: transitionFade1000
 
 • scene <nome> <transição> <duração> <mute> <fadeOut> <volume>
 - Troca para uma cena com parâmetros opcionais. Ex: scene Cena1 fade 1000 true true 70
+- Parâmetros:
+    <nome> - Nome da cena a ser trocada
+    <transição> - Nome da transição a ser utilizada
+    <duração> - Duração da transição em milissegundos
+    <mute> - Se deve mutar a cena ao trocar
+    <fadeOut> - Se deve fazer fade out na cena atual
+    <volume> - Volume da cena atual
 
 • toggleMute
 - Alterna o mute da fonte de áudio padrão
@@ -44,7 +51,7 @@ Comandos que o Listener aceita via UDP:
 - Finaliza transmissão
 
 • listItems
-- Lista os itens da cena atual com sourceName e sceneItemId
+- Lista os itens da cena padrão com sourceName e sceneItemId
 """
         top = Toplevel(root)
         top.title("Comandos Disponíveis")
